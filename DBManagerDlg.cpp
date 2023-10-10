@@ -6,6 +6,9 @@
 #include "DBManagerDlg.h"
 #include "afxdialogex.h"
 #include "util.h"
+#include <mysql.h>
+
+#pragma comment(lib, "libmariadb.lib")
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -97,6 +100,7 @@ ON_BN_CLICKED(ID_Covert_CSV, &CDBManagerDlg::OnBnClickedCovertCsv)
 ON_BN_CLICKED(ID_Covert_CSV2, &CDBManagerDlg::OnBnClickedCovertCsv2)
 ON_BN_CLICKED(ID_DB_Insert2, &CDBManagerDlg::OnBnClickedDbInsert2)
 ON_BN_CLICKED(ID_DB_Open2, &CDBManagerDlg::OnBnClickedDbOpen2)
+ON_BN_CLICKED(ID_DB_Open3, &CDBManagerDlg::OnBnClickedDbOpen3)
 END_MESSAGE_MAP()
 
 
@@ -643,7 +647,6 @@ void CDBManagerDlg::OnBnClickedCovertCsv()
 }
 
 
-
 // CSV 개별 변환
 void CDBManagerDlg::OnBnClickedCovertCsv2()
 {
@@ -730,4 +733,49 @@ void CDBManagerDlg::OnBnClickedDbOpen2()
 	csFullPath = csPath + "\\*.*";
 
 	GetFileList(csFullPath, ".db");
+}
+
+
+int CDBManagerDlg::mariadbConnectTest()
+{
+	MYSQL *conn;
+	MYSQL_RES *res;
+	MYSQL_ROW row;
+
+	conn = mysql_init(NULL);
+
+	if (conn == NULL) {
+		fprintf(stderr, "mysql_init() failed\n");
+		return 1;
+	}
+
+	if (mysql_real_connect(conn, "localhost", "root", "0213", "marketdata", 0, NULL, 0) == NULL) {
+		fprintf(stderr, "mysql_real_connect() failed\n");
+		mysql_close(conn);
+		return 1;
+	}
+
+	if (mysql_query(conn, "SELECT code FROM j8 group by code")) {
+		fprintf(stderr, "SELECT * FROM your_table failed. Error: %s\n", mysql_error(conn));
+		mysql_close(conn);
+		return 1;
+	}
+
+	res = mysql_store_result(conn);
+
+	while ((row = mysql_fetch_row(res))) {
+		printf("Data: %s\n", row[0]); // 결과 처리
+	}
+
+	mysql_free_result(res);
+	mysql_close(conn);
+
+	return 0;
+
+}
+
+void CDBManagerDlg::OnBnClickedDbOpen3()
+{
+	// TODO: Add your control notification handler code here
+	mariadbConnectTest();
 }

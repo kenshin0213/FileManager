@@ -24,6 +24,7 @@
     </None>
     <None Include="sqlite.dll" />
     <None Include="ClassDiagram1.cd" />
+    <None Include="libmariadb.dll" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DBManager.h">

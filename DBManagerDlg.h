@@ -51,6 +51,7 @@ public:
 	int Insert(CString csTRID);
 	void LogPrint(CString csMsg);		
 	void ConvertToCSV(CString _csFileName);
+	int mariadbConnectTest();
 
 
 	afx_msg void OnBnClickedGetdir();
@@ -64,4 +65,5 @@ public:
 	afx_msg void OnBnClickedCovertCsv2();
 	afx_msg void OnBnClickedDbInsert2();
 	afx_msg void OnBnClickedDbOpen2();
+	afx_msg void OnBnClickedDbOpen3();
 };
