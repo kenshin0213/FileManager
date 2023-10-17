@@ -1,0 +1,21 @@
+﻿Build started 2023-10-11 오전 11:55:07.
+     1>Project "C:\Users\Bart\Documents\GitHub\FileManager\DBManager.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /Zi /nologo /W3 /WX- /O2 /Oi /Oy- /GL /D WIN32 /D _WINDOWS /D NDEBUG /D _MBCS /D _AFXDLL /Gm- /EHsc /MD /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Yu"stdafx.h" /Fp"Release\DBManager.pch" /Fo"Release\\" /Fd"Release\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt DBProc_SQLite.cpp
+         DBProc_SQLite.cpp
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\Users\Bart\Documents\GitHub\FileManager\Release\DBManager.exe" /INCREMENTAL:NO /NOLOGO /LIBPATH:"C:\Program Files (x86)\MariaDB 10.5\lib" /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /manifestinput:"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\Include\Manifest\dpiaware.manifest" /DEBUG /PDB:"C:\Users\Bart\Documents\GitHub\FileManager\Release\DBManager.pdb" /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /LTCG /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:\Users\Bart\Documents\GitHub\FileManager\Release\DBManager.lib" /MACHINE:X86 /SAFESEH Release\DBManager.res
+         Release\DBManager.obj
+         Release\DBManagerDlg.obj
+         Release\DBProc_SQLite.obj
+         Release\stdafx.obj
+         Release\util.obj
+         sqlite3.lib
+         Generating code
+         Finished generating code
+         DBManager.vcxproj -> C:\Users\Bart\Documents\GitHub\FileManager\Release\DBManager.exe
+     1>Done Building Project "C:\Users\Bart\Documents\GitHub\FileManager\DBManager.vcxproj" (Build target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:00:02.84

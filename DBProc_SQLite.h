@@ -15,6 +15,8 @@ private:
 	CString m_csTodayDate;
 	CString m_dbFileName;
 	sqlite3 *myDB;
+
+	CStdioFile *ptrLogFile;
 	
 
 public:
@@ -48,6 +50,8 @@ public:
 	CString CreateDBFile();
 	CString GetDate();
 	CString SetDate(CString csDate);
+	CString SetLogFilePtr(CStdioFile* ptrLogFile);
+	void WriteLog(CString logMsg);
 
 protected:
 	DECLARE_MESSAGE_MAP()

@@ -53,6 +53,26 @@ CDBProc_SQLite::~CDBProc_SQLite()
 
 BEGIN_MESSAGE_MAP(CDBProc_SQLite, CWnd)
 END_MESSAGE_MAP()
+
+
+
+
+
+CString CDBProc_SQLite::SetLogFilePtr(CStdioFile* _ptrLogFile)
+{
+	ptrLogFile = _ptrLogFile;
+	ptrLogFile->WriteString("로그파일 포인터가 정상 세팅되었습니다\n");
+	return ("로그파일 포인터가 정상 세팅되었습니다.");
+}
+
+
+void CDBProc_SQLite::WriteLog(CString _logMsg)
+{
+	ptrLogFile->WriteString(_logMsg);
+	ptrLogFile->WriteString("\n");
+}
+
+
 // CDBProc_SQLite 메시지 처리기입니다.
 
 //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -69,6 +89,7 @@ int CDBProc_SQLite::callback(void *NotUsed, int argc, char **argv, char **azColN
    //printf("\n");
    return 0;
 }
+
 
 int CDBProc_SQLite::Sqlite3ExecBegin(sqlite3* _dbName)
 {
@@ -176,7 +197,8 @@ void CDBProc_SQLite::InsertH1(char* _pSiseData, int _iIdx)
 	if(rc != SQLITE_OK)
 	{
 		csMsg.Format("Insert [%s] Table failed..ErrMsg[%s]", csTableName, zErrMsg);
-		//LogPrint(csMsg);
+
+		WriteLog(csMsg);
 		sqlite3_free(zErrMsg);		
 	}	
 }
@@ -228,6 +250,7 @@ void CDBProc_SQLite::InsertK3(char* _pSiseData, int _iIdx)
 	if(rc != SQLITE_OK)
 	{
 		csMsg.Format("Insert [%s] Table failed..ErrMsg[%s]", csTableName, zErrMsg);
+		WriteLog(csMsg);
 		//LogPrint(csMsg);
 		sqlite3_free(zErrMsg);		
 	}
@@ -264,6 +287,7 @@ void CDBProc_SQLite::InsertJ8(char* _pSiseData, int _iIdx)
 	if(rc != SQLITE_OK)
 	{		
 		csMsg.Format("Insert [%s] Table failed..ErrMsg[%s]", csTableName, zErrMsg);
+		WriteLog(csMsg);
 		//LogPrint(csMsg);
 		sqlite3_free(zErrMsg);		
 	}
@@ -300,6 +324,7 @@ void CDBProc_SQLite::InsertK8(char* _pSiseData, int _iIdx)
 	if(rc != SQLITE_OK)
 	{
 		csMsg.Format("Insert [%s] Table failed..ErrMsg[%s]", csTableName, zErrMsg);
+		WriteLog(csMsg);
 		//LogPrint(csMsg);
 		sqlite3_free(zErrMsg);
 	}
@@ -315,36 +340,47 @@ CString CDBProc_SQLite::FileToDB(CString _csTrID, CString _csFileName)
 	
 	BOOL bFlag;
 	bFlag = ptrFile.Open(_csFileName, CFile::modeRead, NULL);
-	if (bFlag)
-	{
+	if (bFlag) {
 		ptrFile.SeekToBegin();
 	}
-	else
-	{
+	else {
 		csMsg.Format("[%s] 파일이 존재 하지 않습니다.", _csFileName);
 		return csMsg;
 	}
+
+	//====================================================================
+	// H1, K3, J8, K8 테이블에 Insert 할때 공통으로 사용하는 변수 및 설정 값들.
+	//--------------------------------------------------------------------
 	int idx = 0;
 	int rc;
 	
+	char *zErrMsg = 0;
 	sqlite3_stmt * stmt;
+
+	rc = sqlite3_open(m_dbFileName, &myDB);
+
+	if (rc != SQLITE_OK)
+	{
+		csMsg.Format("Can't open database: %s",sqlite3_errmsg(myDB));
+		WriteLog(csMsg);
+		return csMsg;
+	}
+
+	sqlite3_exec(myDB, "PRAGMA synchronous=OFF", NULL, NULL, NULL);
+	sqlite3_exec(myDB, "PRAGMA count_changes=OFF", NULL, NULL, NULL);
+	sqlite3_exec(myDB, "PRAGMA journal_mode=MEMORY", NULL, NULL, NULL);
+	sqlite3_exec(myDB, "PRAGMA temp_store=MEMORY", NULL, NULL, NULL);
+	//====================================================================
 
 	if( _csTrID == _TRID_H1)	{		
 		
 		CString csTableName = "H1";
-		char *zErrMsg = 0;
-		
-		sqlite3_exec(myDB, "PRAGMA synchronous=OFF", NULL, NULL, NULL);
-		sqlite3_exec(myDB, "PRAGMA count_changes=OFF", NULL, NULL, NULL);
-		sqlite3_exec(myDB, "PRAGMA journal_mode=MEMORY", NULL, NULL, NULL);
-		sqlite3_exec(myDB, "PRAGMA temp_store=MEMORY", NULL, NULL, NULL);
-	
+			
 		sqlite3_prepare_v2(myDB, (LPSTR)(LPCTSTR)_H1_QRY, -1, &stmt, NULL);
 		rc = sqlite3_exec(myDB, "BEGIN IMMEDIATE TRANSACTION;", NULL, NULL, NULL);
 
 		while(ptrFile.ReadString(csSiseData))
-		{			
-	
+		{				
 			Th1OutBlock* pSiseData = (Th1OutBlock*) (((LPSTR)(LPCTSTR)csSiseData)+3);
 
 			sqlite3_bind_text(stmt,  1, m_csTodayDate                 , -1, SQLITE_TRANSIENT);
@@ -395,30 +431,33 @@ CString CDBProc_SQLite::FileToDB(CString _csTrID, CString _csFileName)
 			sqlite3_bind_text(stmt, 46, SCOPY(pSiseData->S10_bidrem  ), -1, SQLITE_TRANSIENT);
 			sqlite3_bind_text(stmt, 47, SCOPY(pSiseData->volume      ), -1, SQLITE_TRANSIENT);
 			
-			sqlite3_step(stmt);
-			sqlite3_clear_bindings(stmt);
-			sqlite3_reset(stmt);
+			rc = sqlite3_step(stmt);
+			if (rc != SQLITE_DONE){
+				csMsg.Format("Insert [%s] Table failed..ErrMsg[%d][%s]", csTableName, rc, zErrMsg);
+				sqlite3_free(zErrMsg);
+				WriteLog(csMsg);
+				break;
+			}
+			else {
+				sqlite3_clear_bindings(stmt);
+				rc = sqlite3_reset(stmt);
+			}
 
-			if(rc != SQLITE_OK)
+			if (rc != SQLITE_OK)
 			{
-				csMsg.Format("Insert [%s] Table failed..ErrMsg[%s]", csTableName, zErrMsg);
-				sqlite3_free(zErrMsg);		
+				csMsg.Format("Insert [%s] Table failed..ErrMsg[%d][%s]", csTableName, rc, zErrMsg);
+				sqlite3_free(zErrMsg);
+				WriteLog(csMsg);
+				break;
 			}
 		}
 		csMsg.Format("[%s][%s] Insert complete", _csTrID, _csFileName);
 		ptrFile.Close();
 	}
 	else if( _csTrID == _TRID_K3)
-	{
-		
+	{		
 		CString csTableName = "K3";
-		char *zErrMsg = 0;		
-
-		sqlite3_exec(myDB, "PRAGMA synchronous=OFF", NULL, NULL, NULL);
-		sqlite3_exec(myDB, "PRAGMA count_changes=OFF", NULL, NULL, NULL);
-		sqlite3_exec(myDB, "PRAGMA journal_mode=MEMORY", NULL, NULL, NULL);
-		sqlite3_exec(myDB, "PRAGMA temp_store=MEMORY", NULL, NULL, NULL);	
-
+		
 		sqlite3_prepare_v2(myDB, (LPSTR)(LPCTSTR)_K3_QRY, -1, &stmt, NULL);
 		rc = sqlite3_exec(myDB, "BEGIN IMMEDIATE TRANSACTION;", NULL, NULL, NULL);
 
@@ -474,14 +513,24 @@ CString CDBProc_SQLite::FileToDB(CString _csTrID, CString _csFileName)
 			sqlite3_bind_text(stmt, 46, SCOPY(pSiseData->S10_bidrem  ), -1, SQLITE_TRANSIENT);
 			sqlite3_bind_text(stmt, 47, SCOPY(pSiseData->volume      ), -1, SQLITE_TRANSIENT);
 			
-			sqlite3_step(stmt);
-			sqlite3_clear_bindings(stmt);
-			sqlite3_reset(stmt);
+			rc = sqlite3_step(stmt);
+			if (rc != SQLITE_DONE){
+				csMsg.Format("Insert [%s] Table failed..ErrMsg[%d][%s]", csTableName, rc, zErrMsg);
+				sqlite3_free(zErrMsg);
+				WriteLog(csMsg);
+				break;
+			}
+			else {
+				sqlite3_clear_bindings(stmt);
+				rc = sqlite3_reset(stmt);
+			}
 
-			if(rc != SQLITE_OK)
+			if (rc != SQLITE_OK)
 			{
-				csMsg.Format("Insert [%s] Table failed..ErrMsg[%s]", csTableName, zErrMsg);
-				sqlite3_free(zErrMsg);		
+				csMsg.Format("Insert [%s] Table failed..ErrMsg[%d][%s]", csTableName, rc, zErrMsg);
+				sqlite3_free(zErrMsg);
+				WriteLog(csMsg);
+				break;
 			}
 		}
 		csMsg.Format("[%s][%s] Insert complete", _csTrID, _csFileName);
@@ -490,117 +539,131 @@ CString CDBProc_SQLite::FileToDB(CString _csTrID, CString _csFileName)
 	else if( _csTrID == _TRID_J8)
 	{
 		CString csTableName = "J8";
-		char *zErrMsg = 0;		
-
-		sqlite3_exec(myDB, "PRAGMA synchronous=OFF", NULL, NULL, NULL);
-		sqlite3_exec(myDB, "PRAGMA count_changes=OFF", NULL, NULL, NULL);
-		sqlite3_exec(myDB, "PRAGMA journal_mode=MEMORY", NULL, NULL, NULL);
-		sqlite3_exec(myDB, "PRAGMA temp_store=MEMORY", NULL, NULL, NULL);
-	
+			
 		sqlite3_prepare_v2(myDB, (LPSTR)(LPCTSTR)_J8_QRY, -1, &stmt, NULL);
 		rc = sqlite3_exec(myDB, "BEGIN IMMEDIATE TRANSACTION;", NULL, NULL, NULL);
 
-		while(ptrFile.ReadString(csSiseData))
-		{	
-			Tj8OutBlock* pSiseData = (Tj8OutBlock*) (((LPSTR)(LPCTSTR)csSiseData)+3);
+		while (ptrFile.ReadString(csSiseData))
+		{
+			Tj8OutBlock* pSiseData = (Tj8OutBlock*)(((LPSTR)(LPCTSTR)csSiseData) + 3);
 			CString csMovolume;
-			csMovolume.Format("%c",pSiseData->_movolume);
+			csMovolume.Format("%c", pSiseData->_movolume);
 
-			sqlite3_bind_text(stmt,  1, m_csTodayDate                 , -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt,  2, SCOPY(pSiseData->code        ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_int(stmt ,  3, ++idx);
-			sqlite3_bind_text(stmt,  4, SCOPY(pSiseData->time        ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt,  5, SCOPY(pSiseData->sign        ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt,  6, SCOPY(pSiseData->change      ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt,  7, SCOPY(pSiseData->price	     ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt,  8, SCOPY(pSiseData->chrate      ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt,  9, SCOPY(pSiseData->high        ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 10, SCOPY(pSiseData->low         ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 11, SCOPY(pSiseData->offer       ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 12, SCOPY(pSiseData->bid         ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 13, SCOPY(pSiseData->volume      ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 14, SCOPY(pSiseData->volrate     ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 15, SCOPY(pSiseData->movolume    ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 16, csMovolume                    , -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 17, SCOPY(pSiseData->value       ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 18, SCOPY(pSiseData->open        ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 19, SCOPY(pSiseData->avgprice    ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 20, SCOPY(pSiseData->janggubun   ), -1, SQLITE_TRANSIENT);
-						
-			sqlite3_step(stmt);
-			sqlite3_clear_bindings(stmt);
-			sqlite3_reset(stmt);
+			sqlite3_bind_text(stmt, 1, m_csTodayDate, -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 2, SCOPY(pSiseData->code), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_int(stmt, 3, ++idx);
+			sqlite3_bind_text(stmt, 4, SCOPY(pSiseData->time), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 5, SCOPY(pSiseData->sign), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 6, SCOPY(pSiseData->change), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 7, SCOPY(pSiseData->price), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 8, SCOPY(pSiseData->chrate), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 9, SCOPY(pSiseData->high), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 10, SCOPY(pSiseData->low), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 11, SCOPY(pSiseData->offer), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 12, SCOPY(pSiseData->bid), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 13, SCOPY(pSiseData->volume), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 14, SCOPY(pSiseData->volrate), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 15, SCOPY(pSiseData->movolume), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 16, csMovolume, -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 17, SCOPY(pSiseData->value), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 18, SCOPY(pSiseData->open), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 19, SCOPY(pSiseData->avgprice), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 20, SCOPY(pSiseData->janggubun), -1, SQLITE_TRANSIENT);
 
-			if(rc != SQLITE_OK)
-			{
-				csMsg.Format("Insert [%s] Table failed..ErrMsg[%s]", csTableName, zErrMsg);
-				sqlite3_free(zErrMsg);		
+			rc = sqlite3_step(stmt);
+			if (rc != SQLITE_DONE){
+				csMsg.Format("Insert [%s] idx [%d] Table failed..ErrMsg[%d][%s]", SCOPY(pSiseData->code), idx, rc, zErrMsg);
+				
+				sqlite3_free(zErrMsg);
+				WriteLog(csMsg);
+				break;
 			}
-		}
+			else {
+				sqlite3_clear_bindings(stmt);
+				rc = sqlite3_reset(stmt);
+			}
+
+			if (rc != SQLITE_OK)
+			{
+				csMsg.Format("Insert [%s] Table failed..ErrMsg[%d][%s]", csTableName, rc, zErrMsg);
+				sqlite3_free(zErrMsg);
+				WriteLog(csMsg);
+				break;
+			}
+		}				
 		csMsg.Format("[%s][%s] Insert complete", _csTrID, _csFileName);
-		ptrFile.Close();
+		ptrFile.Close();		
 	}
 	else if( _csTrID == _TRID_K8)
 	{		
 		CString csTableName = "K8";
 		char *zErrMsg = 0;		
-
-		sqlite3_exec(myDB, "PRAGMA synchronous=OFF", NULL, NULL, NULL);
-		sqlite3_exec(myDB, "PRAGMA count_changes=OFF", NULL, NULL, NULL);
-		sqlite3_exec(myDB, "PRAGMA journal_mode=MEMORY", NULL, NULL, NULL);
-		sqlite3_exec(myDB, "PRAGMA temp_store=MEMORY", NULL, NULL, NULL);
 	
 		sqlite3_prepare_v2(myDB, (LPSTR)(LPCTSTR)_K8_QRY, -1, &stmt, NULL);
 		rc = sqlite3_exec(myDB, "BEGIN IMMEDIATE TRANSACTION;", NULL, NULL, NULL);
 
-		while(ptrFile.ReadString(csSiseData))
-		{	
-			Tk8OutBlock* pSiseData = (Tk8OutBlock*) (((LPSTR)(LPCTSTR)csSiseData)+3);
+		while (ptrFile.ReadString(csSiseData))
+		{
+			Tk8OutBlock* pSiseData = (Tk8OutBlock*)(((LPSTR)(LPCTSTR)csSiseData) + 3);
 			CString csMovolume;
-			csMovolume.Format("%c",pSiseData->_movolume);
+			csMovolume.Format("%c", pSiseData->_movolume);
 
-			sqlite3_bind_text(stmt,  1, m_csTodayDate                 , -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt,  2, SCOPY(pSiseData->code        ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_int(stmt ,  3, ++idx);
-			sqlite3_bind_text(stmt,  4, SCOPY(pSiseData->time		 ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt,  5, SCOPY(pSiseData->price	     ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt,  6, SCOPY(pSiseData->sign        ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt,  7, SCOPY(pSiseData->change      ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt,  8, SCOPY(pSiseData->chrate      ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt,  9, SCOPY(pSiseData->high        ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 10, SCOPY(pSiseData->low         ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 11, SCOPY(pSiseData->offer       ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 12, SCOPY(pSiseData->bid         ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 13, SCOPY(pSiseData->volume      ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 14, SCOPY(pSiseData->volrate     ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 15, SCOPY(pSiseData->movolume    ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 16, csMovolume                    , -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 17, SCOPY(pSiseData->value       ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 18, SCOPY(pSiseData->open        ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 19, SCOPY(pSiseData->avgprice    ), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_text(stmt, 20, SCOPY(pSiseData->janggubun   ), -1, SQLITE_TRANSIENT);
-			
-			sqlite3_step(stmt);
-			sqlite3_clear_bindings(stmt);
-			sqlite3_reset(stmt);
+			sqlite3_bind_text(stmt, 1, m_csTodayDate, -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 2, SCOPY(pSiseData->code), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_int(stmt, 3, ++idx);
+			sqlite3_bind_text(stmt, 4, SCOPY(pSiseData->time), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 5, SCOPY(pSiseData->price), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 6, SCOPY(pSiseData->sign), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 7, SCOPY(pSiseData->change), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 8, SCOPY(pSiseData->chrate), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 9, SCOPY(pSiseData->high), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 10, SCOPY(pSiseData->low), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 11, SCOPY(pSiseData->offer), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 12, SCOPY(pSiseData->bid), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 13, SCOPY(pSiseData->volume), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 14, SCOPY(pSiseData->volrate), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 15, SCOPY(pSiseData->movolume), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 16, csMovolume, -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 17, SCOPY(pSiseData->value), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 18, SCOPY(pSiseData->open), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 19, SCOPY(pSiseData->avgprice), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 20, SCOPY(pSiseData->janggubun), -1, SQLITE_TRANSIENT);
+
+			rc = sqlite3_step(stmt);
+			if (rc != SQLITE_DONE){
+				csMsg.Format("Insert [%s] idx [%d] Table failed..ErrMsg[%d][%s]", SCOPY(pSiseData->code), idx, rc, zErrMsg);
+
+				sqlite3_free(zErrMsg);
+				WriteLog(csMsg);
+				break;
+			}
+			else {
+				sqlite3_clear_bindings(stmt);
+				rc = sqlite3_reset(stmt);
+			}			
 
 			if(rc != SQLITE_OK)
 			{
-				csMsg.Format("Insert [%s] Table failed..ErrMsg[%s]", csTableName, zErrMsg);
-				sqlite3_free(zErrMsg);		
+				csMsg.Format("Insert [%s] Table failed..ErrMsg[%d][%s]", csTableName, rc, zErrMsg);
+				sqlite3_free(zErrMsg);
+				WriteLog(csMsg);
+				break;
 			}
 		}
 		csMsg.Format("[%s][%s] Insert complete", _csTrID, _csFileName);
-		ptrFile.Close();
+		ptrFile.Close();		
 	}
 	else 
 	{
 		ptrFile.Close();
 				
 		csMsg.Format("[%s] 파일이 존재 하지 않습니다.", _csFileName);
-	}
+	}	
 
 	rc = sqlite3_exec(myDB, "COMMIT;", NULL, NULL, NULL);	
+	sqlite3_finalize(stmt);
+	sqlite3_close(myDB);
+
 	return csMsg;
 }
 

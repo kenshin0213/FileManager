@@ -3,3 +3,7 @@ Debug/*.*
 *.aps
 *.db
 *.aps
+*.ipch
+*.ipch
+*.obj
+*.tlog

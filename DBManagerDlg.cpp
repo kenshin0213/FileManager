@@ -59,6 +59,13 @@ CDBManagerDlg::CDBManagerDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CDBManagerDlg::IDD, pParent)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	csLogFile.Open("Log.txt", CFile::modeCreate | CFile::modeNoTruncate | CFile::modeWrite | CFile::shareDenyWrite, NULL);
+	m_DBProc_SQLite.SetLogFilePtr(&csLogFile);
+}
+
+CDBManagerDlg::~CDBManagerDlg()
+{	
+	csLogFile.Close();
 }
 
 void CDBManagerDlg::DoDataExchange(CDataExchange* pDX)
